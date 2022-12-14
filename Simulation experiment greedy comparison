@@ -6,7 +6,7 @@ opd=5 #Size of probability map will be opd*opd
 L = 15 #Route length. How many cells we wish to pass trough
 path_length = 0.33 # Time it takes to search trough one cell in hours. 0.33=20min
 #s = 0 #Starting point
-T = 0 #Temperature in celsius
+#T = 0 #Temperature in celsius
 
 n=1
 rou_tot=0
@@ -21,13 +21,13 @@ srro=0
 srgr=0
 rouc=0
 grec=0
-    
-    #s=random.choice(list(range(0,opd*opd)))
+
 #np.random.seed(0)
 for m in range(n):
     #### Data generator####
     # Determine two sets of da randomly distributed values.
     s=random.choice(list(range(0,opd*opd)))
+    T=random.choice(list(range(0,28)))
     da=5000
     et = np.random.normal(3,2,da)
     to = np.random.normal(4,1,da)

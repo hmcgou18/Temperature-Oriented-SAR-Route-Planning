@@ -269,6 +269,14 @@ print("identical trough more options",tordje)
 
 import seaborn as sns
 import matplotlib.pyplot as plt
+#### Plotting the routes ####
+sns.heatmap(kas, center=0, cmap='gist_ncar') # plot the Probability map as heatmap
+
+# Define the lines in the plot of best route
+lines=np.zeros((len(route),2))
+for i in range(len(route)):
+    for j in range(2):
+        lines[i,j]=data[route[i],j]
 ## Plot points, lines and starting point label
 plt.plot(data[:,0]+0.5,data[:,1]+0.5,'ro')
 plt.plot(lines[:,0]+0.5,lines[:,1]+0.5)

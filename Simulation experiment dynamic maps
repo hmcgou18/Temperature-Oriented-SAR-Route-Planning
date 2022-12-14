@@ -1,0 +1,308 @@
+import numpy as np
+import math #Oh no!
+import copy
+import random
+
+opd=6 #Size of probability map will be opd*opd
+L = 15 #Route length. How many cells we wish to pass trough
+path_length = 0.33 # Time it takes to search trough one cell in hours. 0.33=20min
+#s = 0 #Starting point
+T = 10 #Temperature in celsius
+
+n=100
+dyn_tot=0
+den_tot=0
+for_tot=0
+samme=0
+tje=0
+dje=0
+tdorje=0
+
+dyn_yay=0
+den_yay=0
+srdy=0
+srde=0
+dync=0
+denc=0
+
+#np.random.seed(0)
+for m in range(n):
+    s=random.choice(list(range(0,opd*opd))) #Random starting point
+    #### Data generator####
+    # Determine two sets of da randomly distributed values.
+    da=5000
+    et = np.random.normal(3,2,da)
+    to = np.random.normal(4,1,da)
+    
+    et=np.vstack(et)
+    to=np.vstack(to)
+    
+    #Make intervals in the normally distributed values, to simulate the POC values of each cell
+    et_frac=(max(et)-min(et))/opd
+    to_frac=(max(to)-min(to))/opd
+    
+    et_opd = np.arange(min(et),max(et)+0.1,et_frac)
+    et_opd[-1]+=0.01
+    to_opd = np.arange(min(to),max(to)+0.1,to_frac)
+    to_opd[-1]+=0.01
+    
+    kas = np.zeros((len(et_opd)-1,len(to_opd)-1))
+    for i in range(len(et)):
+        for k in range(len(et_opd)-1):
+            for j in range(len(to_opd)-1):
+                if (et[i]>=et_opd[k]) and (et[i]<=et_opd[k+1]) and (to[i]>=to_opd[j]) and (to[i]<=to_opd[j+1]):
+                    kas[k,j]+=1
+    kas=kas/da #So the POC values are in percentage
+    sum(sum(kas))
+
+    #### Setup: Lists and Matrices we need to determine best route ####
+    # We want the POC values to have corresponding x,y-coordinates
+    #Make the kas-matrix in list form
+    kase=np.hstack(kas) 
+
+    # Make list of y-coordinates (rows in kas-matrix)
+    ræk=list()
+    for i in range(opd):
+        for j in range(opd):
+            ræk.append(i)
+
+    # Make list of x-coordinates (columns in kas-matrix)
+    søj=list()
+    for i in range(opd):
+        for j in range(opd):
+            søj.append(j)
+
+    # Stack the three lists together for an usable data set
+    data=np.column_stack((søj,ræk,kase))
+    target=np.random.choice(list(range(0,len(data))),p=kase)
+    
+
+    ## We now define the Probability of Survival
+    ST = (0.0547*T*T + 0.5048*T + 1.3604) # Maximum survival time in hours
+    # Initial survival probability
+    if T<20:
+        PS = 0.5+0.025*T
+    if T>=20:
+        PS = 1
+    #Function for probability of survival
+    def undeath(t,ST,PS,path_length):
+        fr=10
+        tra=list(np.linspace(t,t+path_length,fr+1))
+        SRf=0
+        for t in tra[0:-1]:
+            if 0<=t<0.05*ST:
+                SR=1/fr
+            if 0.05*ST<=t<0.3*ST:
+                SR=(PS)/fr
+            if 0.3*ST<=t<0.35*ST:
+                SR=(0.93*PS)/fr
+            if 0.35*ST<=t<0.4*ST:
+                SR=(0.79*PS)/fr
+            if 0.4*ST<=t<0.45*ST:
+                SR=(0.69*PS)/fr
+            if 0.45*ST<=t<0.5*ST:
+                SR=(0.54*PS)/fr
+            if 0.5*ST<=t<0.55*ST:
+                SR=(0.4*PS)/fr
+            if 0.55*ST<=t<0.6*ST:
+                SR=(0.23*PS)/fr
+            if 0.6*ST<=t:
+                SR=(0.06*PS)/fr
+            SRf+=SR
+        return SRf
+
+    ## Now to determine the set of possible routes to choose from
+    V = len(data) #Total amount of cells in the probability map
+    # store all vertex apart from source vertex
+    vertex = []
+    for i in range(V):
+        if i != s:
+            vertex.append(i)
+ 
+    # Also need a matrix that denotes wieght-increase caused by going from point y (row) to point x (column)
+    graph=np.zeros((V,V))
+    for i in range(V):
+        for j in range(V):
+            graph[i,j]=data[j,2]
+
+    # Matrix that tells which cells we are allowed to move to from whatever cell we are currently at
+    bal=np.zeros((V,V),dtype=bool)
+    for i in range(V):
+        for j in range(V):
+            if math.dist(data[i,0:2],data[j,0:2])==1:
+                bal[i][j]=True
+    
+    # List of all possible routes, including all lengths up to L
+    ruter=list()
+    ruter.append([s])
+    for j in ruter:
+        if len(j)==L:
+            break
+        for i in vertex:
+            if bal[j[-1]][i]==True and i not in j:
+                kit=j[:]
+                kit.append(i)        
+                ruter.append(kit)
+
+    #Only want to look at the routes of length L
+    next_permutation=[]
+    for k in range(len(ruter)):
+        if len(ruter[k])==L: 
+            next_permutation.append(ruter[k])
+
+
+    #### Now to find the route with the best POS ####
+    dyn_path = 0 
+    for i in next_permutation:
+        # Compute current path weight
+        current_pathweight = 0 
+        k = s
+        grap=copy.deepcopy(graph)
+        for j in i:
+            t=path_length*i.index(j)
+            current_pathweight += grap[k][j]*undeath(t,ST,PS,path_length)
+            dfac=grap[k][j]/(V-len(i[:i.index(j)+1]))
+            k = j
+            grap+=dfac
+        current_pathweight=round(current_pathweight,4) #Round to 4 decimals
+        # Update maximum      
+        if current_pathweight>dyn_path:
+            dyn_route=i #store the best route
+            djekker=list()
+            dyn_path=current_pathweight
+        if current_pathweight==dyn_path:
+            djekker.append(i)
+    if target in dyn_route:
+        tar_found_dyn=True
+    else:
+        tar_found_dyn=False
+
+
+    #### Benchmark ####
+    ## Now to find the best route, without considering the probability of survival
+    dmax_path=0
+    for i in next_permutation:
+        # Compute current path weight
+        current_pathweight = 0
+        k = s
+        grap=copy.deepcopy(graph)
+        for j in i:
+            t=path_length*i.index(j)
+            current_pathweight += grap[k][j]
+            dfac=grap[k][j]/(V-len(i[:i.index(j)+1]))
+            k = j
+            grap+=dfac
+        current_pathweight=round(current_pathweight,4) #Round to 4 decimals
+        # Update maximum      
+        if current_pathweight>dmax_path:
+            dench_routes=[]
+            dmax_path=current_pathweight
+        # Store the best routes without survival
+        if current_pathweight==dmax_path:
+            dench_routes.append(i)
+    
+            
+    ## Add probability of survival to bechmark routes
+    dench_path=0
+    for i in dench_routes:
+        current_pathweight = 0
+        k = s
+        grap=copy.deepcopy(graph)
+        for j in i:
+            t=path_length*i.index(j)
+            current_pathweight += grap[k][j]*undeath(t,ST,PS,path_length)
+            dfac=grap[k][j]/(V-len(i[:i.index(j)+1]))
+            k = j
+            grap+=dfac
+        current_pathweight=round(current_pathweight,4)
+        if current_pathweight>dench_path:
+            dench_route=i
+            dencher=list()
+            dench_path=current_pathweight
+        if current_pathweight==dench_path:
+            dencher.append(i)
+    if target in dench_route:
+        tar_found_den=True
+    else:
+        tar_found_den=False
+    
+    
+    dyn_tot+=dyn_path #Total sum of the POS values 
+    den_tot+=dench_path #Total sum of the bechmark POS values
+    forskel=abs(dyn_path-dench_path)
+    for_tot+=forskel
+    if (dyn_route==dench_route):
+        samme+=1 #Count the amount of times where the routes are identical
+    if len(djekker)>1:
+        tje+=1
+    if len(dencher)>1:
+        dje+=1
+    if dench_route in djekker or dyn_route in dencher:
+        tdorje+=1
+    if tar_found_dyn==True:
+        dyn_yay+=1
+        tdy=path_length*dyn_route.index(target)
+        sry=undeath(tdy,ST,PS,path_length)
+        srdy+=sry
+        dynl=np.random.choice([True,False],p=[sry,1-sry])
+        if dynl==True:
+            dync+=1
+    if tar_found_den==True:
+        den_yay+=1
+        tde=path_length*dench_route.index(target)
+        sre=undeath(tde,ST,PS,path_length)
+        srde+=sre
+        denl=np.random.choice([True,False],p=[sry,1-sry])
+        if denl==True:
+            denc+=1
+
+dyn_avg=round(dyn_tot/n,4) #Average POS without dynamic
+den_avg=round(den_tot/n,4) #Average POS value with dynamic
+for_avg=round(for_tot/n,4) #Average POS of the difference
+tar_dyn=round(dyn_yay/n,4)
+tar_den=round(den_yay/n,4)
+srdy_avg=round(srdy/dyn_yay,4)
+srde_avg=round(srde/den_yay,4)
+
+print("Average dynamic",dyn_avg)
+print("target found dynamic",dyn_yay,"percentage",tar_dyn)
+print("target found alive",dync, "probability average", srdy_avg)
+print("Average dynamic benchmark",den_avg)
+print("target found benchmark",den_yay,"percentage",tar_den)
+print("target found alive benchmark",denc, "probability average", srde_avg)
+print("Average of total difference",for_avg)
+print("more options dynamic",tje,"benchmark",dje)
+print("Identical route",samme,"times out of",n)
+print("identical more option",tdorje)
+
+
+import seaborn as sns
+import matplotlib.pyplot as plt
+#### Plotting the routes ####
+sns.heatmap(kas, center=0, cmap='gist_ncar') # plot the Probability map as heatmap
+
+# Define the lines in the plot of best route
+lines=np.zeros((len(dyn_route),2))
+for i in range(len(dyn_route)):
+    for j in range(2):
+        lines[i,j]=data[dyn_route[i],j]
+
+## Plot points, lines and starting point label
+plt.plot(data[:,0]+0.5,data[:,1]+0.5,'ro')
+plt.plot(lines[:,0]+0.5,lines[:,1]+0.5)
+plt.text(data[s,0]+0.4, data[s,1]+0.7, str('start'), color="blue", fontsize=12)
+## Plot the POC of each cell
+for i in range(len(data)):
+    plt.text(data[i,0]+0.6, data[i,1]+0.5, str(data[i,2]), color="green", fontsize=12)
+## Plot index/number for each cell
+for i in range(len(data)):
+    plt.text(data[i,0]+0.35, data[i,1]+0.5, str(i), color="red", fontsize=12)
+
+## Plot the benchmark
+dench_lines=np.zeros((len(dench_route),2))
+for i in range(len(dench_route)):
+    for j in range(2):
+        dench_lines[i,j]=data[dench_route[i],j]
+plt.plot(dench_lines[:,0]+0.55,dench_lines[:,1]+0.55, color="salmon")
+
+plt.show()
